@@ -1,0 +1,7 @@
+# Copie este arquivo para "db.properties" (na mesma pasta do .jar) e ajuste.
+# Maquina SERVIDOR: use localhost. Maquina CLIENTE: use o IP fixo do servidor (ex.: 192.168.0.10).
+db.host=localhost
+db.port=3306
+db.name=livro_caixa
+db.user=livrocaixa
+db.password=troque_esta_senha

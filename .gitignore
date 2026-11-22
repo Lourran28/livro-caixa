@@ -1,0 +1,5 @@
+target/
+.vscode/*
+!.vscode/extensions.json
+# credenciais reais do banco nao vao para o repositorio
+db.properties

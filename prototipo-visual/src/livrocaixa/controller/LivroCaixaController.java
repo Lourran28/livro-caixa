@@ -1,5 +1,7 @@
 package livrocaixa.controller;
 
+import br.com.livrocaixa.AppContext;
+import br.com.livrocaixa.model.Funcionario;
 import livrocaixa.model.LivroCaixaModel;
 import livrocaixa.view.TelaLivroCaixa;
 
@@ -14,21 +16,39 @@ import java.util.Objects;
  * encaminhados por esta camada sem misturar Swing com o Model.</p>
  */
 public final class LivroCaixaController {
+    private final AppContext context;
     private final LivroCaixaModel model;
 
     /** Cria o Controller com o cenário demonstrativo fornecido pelo Model. */
     public LivroCaixaController() {
-        this(LivroCaixaModel.load());
+        this.context = new AppContext();
+        this.model = LivroCaixaModel.load();
     }
 
     /** Permite fornecer outro Model, facilitando testes e futuras integrações. */
     public LivroCaixaController(LivroCaixaModel model) {
+        this.context = new AppContext();
         this.model = Objects.requireNonNull(model, "model");
     }
 
     /** Disponibiliza os dados demonstrativos usados durante a execução do front. */
     public LivroCaixaModel getModel() {
         return model;
+    }
+
+    /** Autentica pela camada Controller real do projeto MVC. */
+    public Funcionario autenticar(String nome, String senha) {
+        Funcionario funcionario = context.autenticacao.login(nome, senha);
+        model.connect(context);
+        return funcionario;
+    }
+
+    public void encerrarSessao() {
+        context.autenticacao.logout();
+    }
+
+    public AppContext getContext() {
+        return context;
     }
 
     /** Inicia a View e entrega a ela este Controller. */

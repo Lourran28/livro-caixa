@@ -2,6 +2,10 @@ package livrocaixa.view;
 
 import livrocaixa.controller.LivroCaixaController;
 import livrocaixa.model.*;
+import br.com.livrocaixa.exception.AcessoNegadoException;
+import br.com.livrocaixa.exception.PersistenciaException;
+import br.com.livrocaixa.exception.ValidacaoException;
+import br.com.livrocaixa.model.Funcionario;
 
 import javax.swing.*;
 import javax.swing.border.*;
@@ -150,8 +154,18 @@ public final class TelaLivroCaixa {
                 if (user.getText().isBlank() || pass.getPassword().length == 0) {
                     error(this,"Preencha usuário e senha.");
                 } else {
-                    dispose();
-                    new JanelaPrincipal(controller, user.getText().trim()).setVisible(true);
+                    try {
+                        Funcionario funcionario = controller.autenticar(
+                                user.getText().trim(), new String(pass.getPassword()));
+                        dispose();
+                        new JanelaPrincipal(controller, funcionario.getNome()).setVisible(true);
+                    } catch (ValidacaoException exception) {
+                        error(this, exception.getMessage());
+                    } catch (AcessoNegadoException exception) {
+                        error(this, "Você não possui permissão para acessar o sistema.");
+                    } catch (PersistenciaException exception) {
+                        error(this, "Não foi possível acessar o banco de dados. Verifique a conexão com o servidor.");
+                    }
                 }
             });
             card.add(Box.createVerticalStrut(16));
@@ -184,6 +198,7 @@ public final class TelaLivroCaixa {
         final LivroCaixaController controller;
         final LivroCaixaModel store;
         final String employee;
+        final boolean administrator;
         final JPanel content = new JPanel(new BorderLayout());
         final JLabel pageTitle = title("Painel", 30);
         final Map<String,JButton> nav = new LinkedHashMap<>();
@@ -194,6 +209,7 @@ public final class TelaLivroCaixa {
             this.controller = Objects.requireNonNull(controller, "controller");
             this.store = controller.getModel();
             this.employee = employee;
+            this.administrator = controller.getContext().autenticacao.getUsuarioLogado().isAdministrador();
             setDefaultCloseOperation(EXIT_ON_CLOSE);
             setMinimumSize(new Dimension(1180,700));
             setSize(1500,850);
@@ -213,13 +229,18 @@ public final class TelaLivroCaixa {
             logo.setBorder(new EmptyBorder(26,24,36,10));
             logo.setAlignmentX(LEFT_ALIGNMENT);
             side.add(logo);
-            addNav(side,"Painel","home");
-            addNav(side,"Clientes","user");
-            addNav(side,"Consultas","calendar");
-            addNav(side,"Contas a receber","coins");
-            addNav(side,"Saídas","swap");
-            addNav(side,"Relatórios","chart");
-            addNav(side,"Configurações","gear");
+            if (administrator) {
+                addNav(side,"Painel","home");
+                addNav(side,"Clientes","user");
+                addNav(side,"Consultas","calendar");
+                addNav(side,"Contas a receber","coins");
+                addNav(side,"Saídas","swap");
+                addNav(side,"Relatórios","chart");
+                addNav(side,"Configurações","gear");
+            } else {
+                addNav(side,"Saídas","swap");
+                addNav(side,"Tipos de saída","gear");
+            }
 
             JPanel right = new JPanel(new BorderLayout());
             ComponentesVisuais.GradientPanel top = new ComponentesVisuais.GradientPanel(
@@ -238,7 +259,7 @@ public final class TelaLivroCaixa {
             shell.add(side,BorderLayout.WEST);
             shell.add(right);
             setContentPane(shell);
-            showPage("Painel");
+            showPage(administrator ? "Painel" : "Saídas");
         }
 
         @Override
@@ -322,6 +343,12 @@ public final class TelaLivroCaixa {
 
         private void requestLogout() {
             if (confirm(this,"Sair da conta de " + employee + "?")) {
+                try {
+                    controller.encerrarSessao();
+                } catch (RuntimeException exception) {
+                    error(this, exception.getMessage());
+                    return;
+                }
                 returnToLogin();
             }
         }
@@ -362,6 +389,7 @@ public final class TelaLivroCaixa {
                 case "Saídas" -> expenses();
                 case "Relatórios" -> reports();
                 case "Configurações" -> settings();
+                case "Tipos de saída" -> TelasGerenciamento.auxiliary(this, 1);
                 default -> dashboard();
             };
             ComponentesVisuais.styleChoices(page);
@@ -631,8 +659,7 @@ public final class TelaLivroCaixa {
                         if(store.expenseTypes.stream().anyMatch(item -> item.equalsIgnoreCase(name))) {
                             throw new IllegalArgumentException("Este tipo de saída já está cadastrado.");
                         }
-                        store.expenseTypes.add(name);
-                        store.save();
+                        store.addExpenseType(name);
                         type.addItem(name);
                         type.setSelectedItem(name);
                     }));

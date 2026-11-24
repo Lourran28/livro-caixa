@@ -100,8 +100,7 @@ final class TelasConsultas {
                             .anyMatch(item -> item.equalsIgnoreCase(name))) {
                         throw new IllegalArgumentException("Este tipo de consulta já está cadastrado.");
                     }
-                    frame.store.appointmentTypes.add(name);
-                    frame.store.save();
+                    frame.store.addAppointmentType(name);
                     type.addItem(name);
                     type.setSelectedItem(name);
                 }));

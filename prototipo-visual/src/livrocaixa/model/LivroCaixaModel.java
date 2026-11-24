@@ -1,5 +1,7 @@
 package livrocaixa.model;
 
+import br.com.livrocaixa.AppContext;
+
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -7,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
 
 /**
  * Camada Model do protótipo.
@@ -42,6 +45,30 @@ public final class LivroCaixaModel implements Serializable {
             List.of("Aluguel", "Material de escritório", "Energia"));
     public final List<String> paymentMethods = new ArrayList<>(
             List.of("Dinheiro", "PIX", "Cartão de crédito", "Cartão de débito"));
+
+    private transient AppContext context;
+    private final transient Map<Integer, br.com.livrocaixa.model.Cliente> realClients = new HashMap<>();
+    private final transient Map<Integer, br.com.livrocaixa.model.Parcela> realInstallments = new HashMap<>();
+    private final transient Map<Integer, br.com.livrocaixa.model.Pagamento> realPayments = new HashMap<>();
+
+    /**
+     * Substitui a amostra visual pelos dados fornecidos pelos Controllers reais.
+     * A View continua usando suas projeções leves, sem acessar DAOs ou SQL.
+     */
+    public void connect(AppContext context) {
+        this.context = context;
+        clients.clear(); appointments.clear(); installments.clear(); payments.clear(); expenses.clear();
+        appointmentTypes.clear(); expenseTypes.clear(); paymentMethods.clear();
+        realClients.clear(); realInstallments.clear(); realPayments.clear();
+        context.clientes.listar().forEach(item -> {
+            realClients.put(item.getId(), item);
+            clients.add(new Client(item.getId(), item.getNome(), item.getCpf(), "", "", ""));
+        });
+        context.tiposConsulta.listar().forEach(item -> appointmentTypes.add(item.getDescricao()));
+        context.tiposSaida.listar().forEach(item -> expenseTypes.add(item.getDescricao()));
+        context.formasPagamento.listar().forEach(item -> paymentMethods.add(item.getDescricao()));
+        nextClient = clients.stream().mapToInt(item -> item.id).max().orElse(0) + 1;
+    }
 
     /** Carrega um cenário novo em memória para o front-end demonstrativo. */
     public static LivroCaixaModel load() {
@@ -207,10 +234,43 @@ public final class LivroCaixaModel implements Serializable {
         if (allocated.compareTo(appointment.value) != 0)
             throw new IllegalArgumentException("Pagamentos e parcelas devem totalizar o valor da consulta.");
 
+        if (context != null) {
+            br.com.livrocaixa.model.Cliente realClient = context.clientes.listar().stream()
+                    .filter(item -> item.getNome().equals(appointment.client)).findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("Cliente não encontrado."));
+            br.com.livrocaixa.model.TipoConsulta realType = context.tiposConsulta.listar().stream()
+                    .filter(item -> item.getDescricao().equals(appointment.type)).findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("Tipo de consulta não encontrado."));
+            List<Installment> regular = invoiceInstallments.stream()
+                    .filter(item -> !"Entrada".equalsIgnoreCase(item.label)).toList();
+            boolean cash = invoiceInstallments.isEmpty();
+            BigDecimal entry = invoiceInstallments.stream()
+                    .filter(item -> "Entrada".equalsIgnoreCase(item.label)).map(item -> item.value)
+                    .findFirst().orElse(BigDecimal.ZERO);
+            LocalDate firstDue = regular.isEmpty() ? null : regular.get(0).due;
+            br.com.livrocaixa.model.Consulta real = context.consultas.prepararConsulta(
+                    realClient, realType, appointment.date, appointment.notes, appointment.value,
+                    cash, cash ? null : regular.size(), firstDue, entry);
+            if (!cash) {
+                for (int index = 0; index < regular.size(); index++) {
+                    context.consultas.alterarValorParcela(real, index + 1, regular.get(index).value);
+                }
+            }
+            context.consultas.salvarConsulta(real);
+            appointment.id = real.getId();
+            invoiceInstallments.clear();
+            for (br.com.livrocaixa.model.Parcela parcela : real.getFatura().getParcelas()) {
+                String label = parcela.getTipoParcela() != null && parcela.getTipoParcela().getId() == 3
+                        ? "Entrada" : parcela.getPosicaoParcela() + "/" + parcela.getNumParcelas();
+                Installment projection = new Installment(parcela.getId(), real.getId(), appointment.client,
+                        label, parcela.getDataVencimento(), parcela.getValor(), parcela.getValorPago(), false);
+                invoiceInstallments.add(projection);
+                realInstallments.put(projection.id, parcela);
+            }
+            invoicePayments.clear();
+        }
         payments.addAll(invoicePayments);
         installments.addAll(invoiceInstallments);
-        invoicePayments.forEach(payment -> nextPayment = Math.max(nextPayment, payment.id + 1));
-        invoiceInstallments.forEach(installment -> nextInstallment = Math.max(nextInstallment, installment.id + 1));
         appointment.billed = true;
         save();
     }
@@ -219,9 +279,19 @@ public final class LivroCaixaModel implements Serializable {
         if (name == null || name.isBlank() || cpf == null || cpf.isBlank()) {
             throw new IllegalArgumentException("Informe o nome e o CPF.");
         }
-        if (client == null) {
-            client = new Client(nextClient++, name.trim(), cpf.trim(), "", "", "");
-            clients.add(client);
+        if (context != null) {
+            br.com.livrocaixa.model.Cliente real = client == null
+                    ? new br.com.livrocaixa.model.Cliente()
+                    : realClients.get(client.id);
+            if (real == null) throw new IllegalArgumentException("Cliente não encontrado.");
+            real.setNome(name.trim()); real.setCpf(cpf.trim()); context.clientes.salvar(real);
+            if (client == null) {
+                client = new Client(real.getId(), real.getNome(), real.getCpf(), "", "", "");
+                clients.add(client); realClients.put(real.getId(), real);
+            } else { client.name = real.getNome(); client.cpf = real.getCpf(); }
+            return client;
+        } else if (client == null) {
+            client = new Client(nextClient++, name.trim(), cpf.trim(), "", "", ""); clients.add(client);
         } else {
             int clientId = client.id;
             if (clients.stream().noneMatch(item -> item.id == clientId)) {
@@ -235,8 +305,64 @@ public final class LivroCaixaModel implements Serializable {
     }
 
     public void removeClient(Client client) {
+        if (context != null) { context.clientes.excluir(client.id); realClients.remove(client.id); }
         clients.remove(client);
         save();
+    }
+
+    public String addAppointmentType(String description) {
+        return saveCategory(appointmentTypes, -1, description);
+    }
+
+    public String addExpenseType(String description) {
+        return saveCategory(expenseTypes, -1, description);
+    }
+
+    public String saveCategory(List<String> values, int index, String description) {
+        String text = description == null ? "" : description.trim();
+        if (text.isBlank()) throw new IllegalArgumentException("Informe a descrição.");
+        if (context == null) {
+            if (index >= 0) values.set(index, text); else values.add(text);
+            return text;
+        }
+        String previous = index >= 0 ? values.get(index) : null;
+        if (values == appointmentTypes) {
+            br.com.livrocaixa.model.TipoConsulta item = previous == null
+                    ? new br.com.livrocaixa.model.TipoConsulta()
+                    : context.tiposConsulta.listar().stream().filter(v -> v.getDescricao().equals(previous)).findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("Tipo de consulta não encontrado."));
+            item.setDescricao(text); context.tiposConsulta.salvar(item);
+        } else if (values == expenseTypes) {
+            br.com.livrocaixa.model.TipoSaida item = previous == null
+                    ? new br.com.livrocaixa.model.TipoSaida()
+                    : context.tiposSaida.listar().stream().filter(v -> v.getDescricao().equals(previous)).findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("Tipo de saída não encontrado."));
+            item.setDescricao(text); context.tiposSaida.salvar(item);
+        } else if (values == paymentMethods) {
+            br.com.livrocaixa.model.FormaPagamento item = previous == null
+                    ? new br.com.livrocaixa.model.FormaPagamento()
+                    : context.formasPagamento.listar().stream().filter(v -> v.getDescricao().equals(previous)).findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("Forma de pagamento não encontrada."));
+            item.setDescricao(text); context.formasPagamento.salvar(item);
+        }
+        if (index >= 0) values.set(index, text); else values.add(text);
+        return text;
+    }
+
+    public void deleteCategory(List<String> values, int index) {
+        String description = values.get(index);
+        if (context != null) {
+            if (values == appointmentTypes) context.tiposConsulta.listar().stream()
+                    .filter(v -> v.getDescricao().equals(description)).findFirst()
+                    .ifPresent(v -> context.tiposConsulta.excluir(v.getId()));
+            else if (values == expenseTypes) context.tiposSaida.listar().stream()
+                    .filter(v -> v.getDescricao().equals(description)).findFirst()
+                    .ifPresent(v -> context.tiposSaida.excluir(v.getId()));
+            else if (values == paymentMethods) context.formasPagamento.listar().stream()
+                    .filter(v -> v.getDescricao().equals(description)).findFirst()
+                    .ifPresent(v -> context.formasPagamento.excluir(v.getId()));
+        }
+        values.remove(index);
     }
 
     public Appointment saveAppointment(Appointment appointment, String client, String type,
@@ -275,7 +401,16 @@ public final class LivroCaixaModel implements Serializable {
                 || date == null || employee == null || employee.isBlank()) {
             throw new IllegalArgumentException("Dados da saída inválidos.");
         }
-        if (expense == null) {
+        if (context != null) {
+            if (expense != null) throw new IllegalArgumentException("A edição de saídas depende do método de atualização no Controller.");
+            br.com.livrocaixa.model.TipoSaida realType = context.tiposSaida.listar().stream()
+                    .filter(item -> item.getDescricao().equals(type)).findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("Tipo de saída não encontrado."));
+            br.com.livrocaixa.model.Saida real = context.saidas.registrarSaida(date, value, realType, notes);
+            expense = new Expense(real.getId(), type, description, value, date,
+                    real.getFuncionario().getNome(), notes == null ? "" : notes);
+            expenses.add(expense);
+        } else if (expense == null) {
             expense = new Expense(nextExpense++, type, description, value, date, employee,
                     notes == null ? "" : notes);
             expenses.add(expense);
@@ -296,6 +431,7 @@ public final class LivroCaixaModel implements Serializable {
     }
 
     public void removeExpense(Expense expense) {
+        if (context != null) throw new IllegalArgumentException("A exclusão de saídas ainda não existe no Controller do projeto.");
         expenses.remove(expense);
         save();
     }
@@ -311,10 +447,22 @@ public final class LivroCaixaModel implements Serializable {
                 || value.add(discount).compareTo(installment.remaining()) > 0) {
             throw new IllegalArgumentException("Pagamento inválido.");
         }
-        installment.paid = installment.paid.add(value).add(discount);
-        Payment payment = new Payment(nextPayment++, installment.appointmentId, installment.client,
+        if (context != null && discount.signum() > 0)
+            throw new IllegalArgumentException("Descontos não existem no Model de pagamento do projeto.");
+        br.com.livrocaixa.model.Pagamento realPayment = null;
+        if (context != null) {
+            br.com.livrocaixa.model.Parcela realInstallment = realInstallments.get(installment.id);
+            br.com.livrocaixa.model.FormaPagamento realMethod = context.formasPagamento.listar().stream()
+                    .filter(item -> item.getDescricao().equals(method)).findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("Forma de pagamento não encontrada."));
+            if (realInstallment == null) throw new IllegalArgumentException("Parcela não encontrada no Controller.");
+            realPayment = context.parcelamentos.baixarParcela(realInstallment.getId(), value, realMethod, date);
+            installment.paid = realInstallment.getValorPago();
+        } else installment.paid = installment.paid.add(value).add(discount);
+        Payment payment = new Payment(realPayment == null ? nextPayment++ : realPayment.getId(), installment.appointmentId, installment.client,
                 installment.label, date, value, method, discount, false);
         payments.add(payment);
+        if (realPayment != null) realPayments.put(payment.id, realPayment);
         save();
         return payment;
     }
@@ -326,6 +474,7 @@ public final class LivroCaixaModel implements Serializable {
         if (installment.isPaid()) {
             throw new IllegalArgumentException("Uma parcela quitada não pode ser cancelada.");
         }
+        if (context != null) context.parcelamentos.cancelarParcela(installment.id);
         installment.cancelled = true;
         save();
     }
@@ -338,6 +487,7 @@ public final class LivroCaixaModel implements Serializable {
                 || !payment.label.equals(installment.label)) {
             throw new IllegalArgumentException("Pagamento não pertence a esta parcela.");
         }
+        if (context != null) context.parcelamentos.desfazerBaixa(installment.id, payment.id);
         payment.reversed = true;
         installment.paid = installment.paid
                 .subtract(payment.value.add(payment.discount))

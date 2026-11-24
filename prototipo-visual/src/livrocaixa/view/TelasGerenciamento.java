@@ -524,7 +524,7 @@ final class TelasGerenciamento {
         return p;
     }
 
-    private static JComponent auxiliary(TelaLivroCaixa.JanelaPrincipal frame, int selected) {
+    static JComponent auxiliary(TelaLivroCaixa.JanelaPrincipal frame, int selected) {
         JPanel root = TelaLivroCaixa.page();
         ComponentesVisuais.RoundPanel body = new ComponentesVisuais.RoundPanel(17).fill(new Color(249, 251, 255));
         body.setLayout(new BorderLayout(0, 14));
@@ -537,33 +537,38 @@ final class TelasGerenciamento {
         JPanel headingBar = new JPanel(new BorderLayout());
         headingBar.setOpaque(false);
         headingBar.add(heading);
-        JButton back = ComponentesVisuais.secondary("Voltar para configurações", "back");
+        JButton back = ComponentesVisuais.secondary(
+                frame.administrator ? "Voltar para configurações" : "Voltar para saídas", "back");
         back.setPreferredSize(new Dimension(285, 48));
-        back.addActionListener(e -> frame.showPage("Configurações"));
+        back.addActionListener(e -> frame.showPage(frame.administrator ? "Configurações" : "Saídas"));
         headingBar.add(back, BorderLayout.EAST);
         body.add(headingBar, BorderLayout.NORTH);
 
         JTabbedPane tabs = new JTabbedPane();
         tabs.setFont(new Font("Segoe UI", Font.BOLD, 18));
-        tabs.addTab("Tipos de consulta", categoryEditor(
-                frame,
-                frame.store.appointmentTypes,
-                "tipo de consulta",
-                "Estas opções aparecem no cadastro de consultas.",
-                v -> frame.store.appointments.stream().anyMatch(a -> a.type.equals(v))));
+        if (frame.administrator) {
+            tabs.addTab("Tipos de consulta", categoryEditor(
+                    frame,
+                    frame.store.appointmentTypes,
+                    "tipo de consulta",
+                    "Estas opções aparecem no cadastro de consultas.",
+                    v -> frame.store.appointments.stream().anyMatch(a -> a.type.equals(v))));
+        }
         tabs.addTab("Tipos de saída", categoryEditor(
                 frame,
                 frame.store.expenseTypes,
                 "tipo de saída",
                 "Estas opções aparecem no cadastro de saídas.",
                 v -> frame.store.expenses.stream().anyMatch(x -> x.type.equals(v))));
-        tabs.addTab("Formas de pagamento", categoryEditor(
-                frame,
-                frame.store.paymentMethods,
-                "forma de pagamento",
-                "Estas opções aparecem no registro de pagamentos.",
-                v -> frame.store.payments.stream().anyMatch(x -> x.method.equals(v))));
-        tabs.setSelectedIndex(Math.max(0, Math.min(selected, 2)));
+        if (frame.administrator) {
+            tabs.addTab("Formas de pagamento", categoryEditor(
+                    frame,
+                    frame.store.paymentMethods,
+                    "forma de pagamento",
+                    "Estas opções aparecem no registro de pagamentos.",
+                    v -> frame.store.payments.stream().anyMatch(x -> x.method.equals(v))));
+            tabs.setSelectedIndex(Math.max(0, Math.min(selected, 2)));
+        }
         body.add(tabs);
 
         ComponentesVisuais.RoundPanel tips = new ComponentesVisuais.RoundPanel(12).fill(new Color(231, 240, 255)).shadow(false);
@@ -628,11 +633,10 @@ final class TelasGerenciamento {
             String text = description.getText().trim();
             if (text.isBlank()) return;
             if (editing[0] >= 0) {
-                values.set(editing[0], text);
+                frame.store.saveCategory(values, editing[0], text);
             } else {
-                values.add(text);
+                frame.store.saveCategory(values, -1, text);
             }
-            frame.store.save();
             model.setDataVector(listRows(values), new String[]{"Código", "Descrição", "Ações"});
             editing[0] = -1;
             description.setText("");
@@ -651,8 +655,7 @@ final class TelasGerenciamento {
                     }
                     if (TelaLivroCaixa.confirm(frame,
                             "Excluir o cadastro \"" + values.get(row) + "\"?")) {
-                        values.remove(row);
-                        frame.store.save();
+                        frame.store.deleteCategory(values, row);
                         model.setDataVector(
                                 listRows(values), new String[]{"Código", "Descrição", "Ações"});
                     }

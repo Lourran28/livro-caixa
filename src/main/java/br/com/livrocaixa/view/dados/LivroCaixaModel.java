@@ -1,4 +1,4 @@
-package livrocaixa.model;
+package br.com.livrocaixa.view.dados;
 
 import br.com.livrocaixa.AppContext;
 

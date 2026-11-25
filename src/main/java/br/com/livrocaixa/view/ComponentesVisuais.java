@@ -1,4 +1,4 @@
-package livrocaixa.view;
+package br.com.livrocaixa.view;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;

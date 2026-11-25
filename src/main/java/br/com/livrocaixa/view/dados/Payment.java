@@ -1,4 +1,4 @@
-package livrocaixa.model;
+package br.com.livrocaixa.view.dados;
 
 import java.io.Serializable;
 import java.math.BigDecimal;

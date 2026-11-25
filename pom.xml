@@ -32,22 +32,6 @@
 
     <build>
         <plugins>
-            <!-- Mantém o protótipo visual original como fonte durante a integração MVC. -->
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>build-helper-maven-plugin</artifactId>
-                <version>3.6.1</version>
-                <executions>
-                    <execution>
-                        <id>adicionar-front-original</id>
-                        <phase>generate-sources</phase>
-                        <goals><goal>add-source</goal></goals>
-                        <configuration>
-                            <sources><source>prototipo-visual/src</source></sources>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
             <!-- Gera um unico .jar executavel (target/livro-caixa-<versao>.jar) para instalar nas maquinas -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

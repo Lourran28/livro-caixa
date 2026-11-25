@@ -1,9 +1,8 @@
-package livrocaixa.controller;
+package br.com.livrocaixa.view;
 
 import br.com.livrocaixa.AppContext;
 import br.com.livrocaixa.model.Funcionario;
-import livrocaixa.model.LivroCaixaModel;
-import livrocaixa.view.TelaLivroCaixa;
+import br.com.livrocaixa.view.dados.LivroCaixaModel;
 
 import java.util.Objects;
 
@@ -15,18 +14,18 @@ import java.util.Objects;
  * banco de dados forem implementados, os eventos das telas poderão ser
  * encaminhados por esta camada sem misturar Swing com o Model.</p>
  */
-public final class LivroCaixaController {
+public final class CoordenadorTelas {
     private final AppContext context;
     private final LivroCaixaModel model;
 
     /** Cria o Controller com o cenário demonstrativo fornecido pelo Model. */
-    public LivroCaixaController() {
+    public CoordenadorTelas() {
         this.context = new AppContext();
         this.model = LivroCaixaModel.load();
     }
 
     /** Permite fornecer outro Model, facilitando testes e futuras integrações. */
-    public LivroCaixaController(LivroCaixaModel model) {
+    public CoordenadorTelas(LivroCaixaModel model) {
         this.context = new AppContext();
         this.model = Objects.requireNonNull(model, "model");
     }

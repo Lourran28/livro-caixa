@@ -1,7 +1,6 @@
-package livrocaixa.view;
+package br.com.livrocaixa.view;
 
-import livrocaixa.controller.LivroCaixaController;
-import livrocaixa.model.Appointment;
+import br.com.livrocaixa.view.dados.Appointment;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;
@@ -31,7 +30,7 @@ public final class TesteInicializacao {
     }
 
     private static void runVisualFlow() {
-        LivroCaixaController controller = new LivroCaixaController();
+        CoordenadorTelas controller = new CoordenadorTelas();
         TelaLivroCaixa.JanelaLogin login = new TelaLivroCaixa.JanelaLogin(controller);
         login.setVisible(true);
         render(login, "00-login");

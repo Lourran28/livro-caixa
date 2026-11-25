@@ -1,7 +1,7 @@
 package br.com.livrocaixa;
 
-import livrocaixa.controller.LivroCaixaController;
-import livrocaixa.model.*;
+import br.com.livrocaixa.view.CoordenadorTelas;
+import br.com.livrocaixa.view.dados.*;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class IntegracaoFrontOriginalTest {
     @Test
     void deveConectarFluxoPrincipalSemTrocarAsViews() {
-        LivroCaixaController controller = new LivroCaixaController();
+        CoordenadorTelas controller = new CoordenadorTelas();
         controller.autenticar("Ana Souza", "123456");
         LivroCaixaModel view = controller.getModel();
 

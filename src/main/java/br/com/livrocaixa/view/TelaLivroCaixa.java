@@ -1,7 +1,6 @@
-package livrocaixa.view;
+package br.com.livrocaixa.view;
 
-import livrocaixa.controller.LivroCaixaController;
-import livrocaixa.model.*;
+import br.com.livrocaixa.view.dados.*;
 import br.com.livrocaixa.exception.AcessoNegadoException;
 import br.com.livrocaixa.exception.PersistenciaException;
 import br.com.livrocaixa.exception.ValidacaoException;
@@ -46,7 +45,7 @@ public final class TelaLivroCaixa {
      * Configura a interface e abre a tela de acesso.
      * O Controller entrega o cenário demonstrativo que será exibido pela View.
      */
-    public static void start(LivroCaixaController controller) {
+    public static void start(CoordenadorTelas controller) {
         Objects.requireNonNull(controller, "controller");
         try { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()); } catch (Exception ignored) {}
         ComponentesVisuais.installDefaults();
@@ -58,9 +57,9 @@ public final class TelaLivroCaixa {
 
     /** Janela inicial demonstrativa. A autenticação apenas valida campos preenchidos. */
     static final class JanelaLogin extends JFrame {
-        private final LivroCaixaController controller;
+        private final CoordenadorTelas controller;
 
-        JanelaLogin(LivroCaixaController controller) {
+        JanelaLogin(CoordenadorTelas controller) {
             super("Livro Caixa");
             setIconImage(appIcon());
             setDefaultCloseOperation(EXIT_ON_CLOSE);
@@ -195,7 +194,7 @@ public final class TelaLivroCaixa {
      * quando o usuário navega pelo sistema.
      */
     static final class JanelaPrincipal extends JFrame {
-        final LivroCaixaController controller;
+        final CoordenadorTelas controller;
         final LivroCaixaModel store;
         final String employee;
         final boolean administrator;
@@ -203,7 +202,7 @@ public final class TelaLivroCaixa {
         final JLabel pageTitle = title("Painel", 30);
         final Map<String,JButton> nav = new LinkedHashMap<>();
 
-        JanelaPrincipal(LivroCaixaController controller, String employee) {
+        JanelaPrincipal(CoordenadorTelas controller, String employee) {
             super("Livro Caixa");
             setIconImage(appIcon());
             this.controller = Objects.requireNonNull(controller, "controller");

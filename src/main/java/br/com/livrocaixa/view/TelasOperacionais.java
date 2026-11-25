@@ -1,6 +1,6 @@
-package livrocaixa.view;
+package br.com.livrocaixa.view;
 
-import livrocaixa.model.*;
+import br.com.livrocaixa.view.dados.*;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
